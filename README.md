@@ -33,7 +33,7 @@
 ### ⏳ Durata jocului – fără „zid" mai lung de 2 zile (verificat cu simulatoare)
 - **Clădirile LV 5–10**: costă ×2.5, dar se plătesc în **5 părți** (bară cu 5 liniuțe; la garaje fiecare parte dă deja o parte din bonusul de bani al nivelului următor). Rezultat simulat: **~6 luni** până la tot LV 10 la ~1 oră de joc pe zi (≈ 3.5 luni la 2 h/zi, ≈ 8 luni la 30 min/zi), cu maxim ~2 zile între două progrese.
 - **Idle Rewards** cresc și cu nivelul clădirilor (la nivele mari câștigi bine și cu jocul închis).
-- **Campania**: boss-urile din primele capitole sunt mai ușoare (cap. 1 ×0.42 … cap. 5 ×0.9) – boss-ul 1-20 se bate în ~2–3 zile, nu în săptămâni. Nou: **🔥 NEVER GIVE UP** – dacă pierzi la stage-ul următor, echipa ta primește **+7.5% HP și atac la fiecare 6 ore** cât stai blocat (max +60% după 2 zile), doar pentru acel stage; se vede pe cartonașul stage-ului.
+- **Campania**: boss-urile din primele capitole sunt mai ușoare (cap. 1 ×0.42 … cap. 5 ×0.8, cap. 6+ ×0.72 – v16-40) – boss-ul 1-20 se bate în ~2–3 zile, nu în săptămâni. Nou: **🔥 NEVER GIVE UP** – dacă pierzi la stage-ul următor, echipa ta primește **+7.5% HP și atac la fiecare 6 ore** cât stai blocat (max +60% după 2 zile), doar pentru acel stage; se vede pe cartonașul stage-ului.
 ### ⚡ Lag
 - În bătălie fundalul (5 straturi) se lipește în 2 poze gata făcute cât echipa stă pe loc → mult mai puțin de desenat pe fiecare cadru. Testat: harta, campania și MY CREW la 60 fps; fără erori.
 ### 📱 Google Play + 🛡️ anti-cheat – vezi **GOOGLE_PLAY.md** (pași de pe telefon)

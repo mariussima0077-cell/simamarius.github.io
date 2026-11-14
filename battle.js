@@ -272,7 +272,7 @@ const ROLE={
  elec:{n:'Shocker',ic:'⚡',hp:730,atk:90,def:10,mv:80,rng:205,as:1.25,crit:.1,sk:'OVERVOLT',skd:'Chain lightning jumps 6 times: 200% damage and stun 1.5s.'},
  all:{n:'Legend',ic:'🌟',hp:1350,atk:112,def:26,mv:92,rng:42,as:.9,crit:.15,sk:'TORQUE STORM',skd:'Giant gears rain on every enemy: 300% damage. All mechanics +30% attack for 6s.'},
  crew:{n:'Crew',ic:'🔩',hp:700,atk:50,def:8,mv:84,rng:30,as:1.1,crit:.06,sk:'WRENCH THROW',skd:'Throws a spinning wrench: 250% damage.'}};
-const GMUL=[1,1.32,1.75,2.3,3.0,3.9];
+const GMUL=[1,1.32,1.75,2.3,3.4,4.4]; // v16-40: Legendary 3.0→3.4, Mythic 3.9→4.4 (a new Legendary now beats an Uncommon +50)
 // v16-14: unique skills (each Legendary / Mythic has its own skill; the others still use their class skill)
 const HSK={
  m4_0:{sk:'IRON QUAKE',skd:'Smashes the ground: a wall of rocks rolls through ALL enemies – 230% damage and stun 1.6s. Gains a 30% shield and taunts enemies.'},
@@ -632,7 +632,7 @@ function myMechs(){const T=TE(),o=[];
   o.sort((a,b)=>pow(b)-pow(a));return o;}
 function stars(h){const o=TE().G.h.own[h.id];return o?o.s:0;}
 function roleOf(h){return h.crew?'crew':(h.sp||'all');}
-function unitStats(h,ov){const R=ROLE[roleOf(h)],m=h.crew?.85:GMUL[h.gr]*(TE().starK?TE().starK(stars(h)):1+.2*stars(h));const b=h.crew?ZB:gearBon(heroGear(h.id,ov));
+function unitStats(h,ov){const R=ROLE[roleOf(h)],m=h.crew?.85:GMUL[h.gr]*(TE().starK?TE().starK(stars(h),h.gr):1+.2*stars(h));const b=h.crew?ZB:gearBon(heroGear(h.id,ov));
   return {hp:Math.round(R.hp*m*(1+b.hp/100)),atk:R.atk*m*(1+b.atk/100),def:R.def*(h.crew?1:1+h.gr*.12)*(1+b.def/100),mv:R.mv,rng:R.rng,as:R.as/(1+b.aspd/100),crit:Math.min(.75,R.crit+b.crit/100),eg:1+b.en/100,b};}
 function powS(s,R){return Math.round(s.hp*.25+s.atk*6*(R.as/s.as)*(1+(s.crit-R.crit)*.8)*(1+(s.eg-1)*.25)+s.def*4);}
 function pow(h,ov){return powS(unitStats(h,ov),ROLE[roleOf(h)]);}
@@ -642,7 +642,7 @@ function teamHeroes(){const T=TE(),ids=(T.G.cp.team||[]).filter(id=>id.startsWit
 function bestTeam(){const m=myMechs().slice(0,5).map(h=>h.id);let k=0;while(m.length<5)m.push('crew'+(k++));return m;}
 function teamPower(list){return list.reduce((a,h)=>a+pow(h),0);}
 // v15: early bosses are easier (no long wall at the start of the game)
-const BEASE=c=>[.42,.55,.68,.8,.9][c]??1;
+const BEASE=c=>[.42,.55,.68,.8,.8][c]??.72; // v16-40: 2-month test – chapter bosses were walls of 7-13 days (5-20 .9→.8, chapter 6+ 1→.72)
 const stEase=i=>{const s=STAGES[i];return s.boss?BEASE(s.c):s.mini?(1+BEASE(s.c))/2:1;};
 function enemyPower(i){const s=STAGES[i],k=stageMul(i)*stEase(i);let p=0;s.w.forEach(w=>w.forEach(t=>{const M=MON[t];p+=(M.hp*.25+M.atk*6+M.def*4)*k;}));return Math.round(p/s.w.length*1.05);}
 function crewPortrait(k){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');
@@ -732,7 +732,6 @@ function sprFrame(u,t){const a=u.act,d=u.spr,R=d.R||[0,1,2,3,4,5];
   return[R[0],Math.floor(t*4+u.k*3)%4];}
 function drawSprHero(g,u,t,d,alpha){const [r,c]=sprFrame(u,t);
   g.save();g.scale(u.face,1);
-  if(u.buff>0&&!u.dead){g.fillStyle='rgba(255,170,0,.22)';ell(g,0,-40,30,46);}
   const k=SPK; // units per 256-cell px
   if(d.noKO&&u.dead)g.rotate(-Math.min(1,u.deadT*2.2)*Math.PI/2*.92); // no KO picture → falls over
   const w=d.w||256,cw=w*SPCELL/256;
@@ -1190,8 +1189,10 @@ function bsize(force){const w=innerWidth,h=innerHeight,d=Math.min(2,window.devic
   if(!force&&w===W&&h===H&&d===DPR&&cv.width===Math.round(w*d))return false;W=w;H=h;DPR=d;BDPR=Math.min(DPR,1.5);cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);
   S=clamp(Math.min(W/390,H/800),.8,1.5);HOR=H*.36;FY0=H*.47;FY1=H*.77;PANEL=H-Math.min(150,H*.19);if(B)buildBG();return true;}
 
-// v15: NEVER GIVE UP – stuck on your next stage? Your mechanics train: +7.5% HP & attack every 6 hours (max +60% after 2 days). Resets when you win it.
-function grit(si){const G=TE().G,st=G.cp.stuck;if(!st||st.si!==si||si!==G.cp.best)return 0;return Math.min(8,Math.floor((Date.now()-st.t)/216e5))*.075;}
+// v15: NEVER GIVE UP – stuck on your next stage? Your mechanics train: +7.5% HP & attack every 6 hours for 2 days, then +15% every 6 hours (max +300%). Resets when you win it.
+// v16-40: no wall longer than ~2 days (Marius' rule) – after 2 days the training grows faster: +15% every 6 h, up to +300%
+const GRIT_N=24,gritK=n=>n<=8?n*.075:.6+(n-8)*.15,gritStep=n=>n<8?.075:.15;
+function grit(si){const G=TE().G,st=G.cp.stuck;if(!st||st.si!==si||si!==G.cp.best)return 0;return gritK(Math.min(GRIT_N,Math.floor((Date.now()-st.t)/216e5)));}
 function mkHeroUnit(h,i,n){const s=unitStats(h),r=roleOf(h),gk=1+(B.grit||0);
   return {hero:1,h,spr:sprOf(h),land:0,role:r,look:lookOf(h),k:i*1.7,name:h.crew?h.n:h.n,hp:s.hp*gk,max:s.hp*gk,atk:s.atk*gk,def:s.def,mv:s.mv*S,rng:s.rng*S,as:s.as,crit:s.crit,eg:s.eg,
     x:0,d:0,face:1,st:'idle',ap:0,cd:rnd(0,.6),wph:rnd(0,6),en:0,stun:0,slow:0,mark:0,buff:0,aspd:0,aspdK:0,defB:0,critB:0,shield:0,flash:0,hurt:0,hot:0,hotT:0,taunt:0,dead:false,deadT:0,hits:0,act:null,slot:i};}
@@ -1337,7 +1338,7 @@ function projHit(p){const s=p.src,[x,y0]=[p.x,fy(p.d)],y=y0-p.h;
 
 // ---------------------------------------------------------------- hero skills
 function canCast(u){return B.phase==='fight'&&!u.dead&&u.en>=100&&u.stun<=0&&!u.act&&alive(B.mons).length>0;}
-function cast(u){if(!canCast(u))return;u.en=0;B.slowT=.45;B.flash=.35;punch(.045);if(FX2)fxAura(u);
+function cast(u){if(!canCast(u))return;u.en=0;B.slowT=.45;B.flash=.35;punch(.045);if(FX2&&!sprOK(u.spr))fxAura(u); // v16-40: heroes with Marius' pictures show only the effect drawn in their own skill animation
   B.banner={u,t:0,name:skOf(u.h).sk};
   const R=u.role,ms=alive(B.mons);
   if(SKF[u.h.id]){SKF[u.h.id](u,ms);return;}
@@ -1454,7 +1455,7 @@ function unitUpdate(u,dt,foes,friends){
         const F=a.fire,P=a.p||{},c1=F?'#ff6d00':a.col||'#40c4ff',c2=F?'#ff3d00':a.col||'#2979ff',c3=F?'#ffd180':a.col?hexA(a.col,.6):'#80d8ff';
         for(const m of alive(B.mons))if(!a.hit.has(m)&&Math.abs(m.x-u.x)<26*S&&(a.all||Math.abs(m.d-u.d)<(a.band||.2))){a.hit.add(m);damage(u,m,a.mult||2.6,{crit:1,skill:1});if(F)burnOn(m,u);if(P.mark)m.mark=Math.max(m.mark,P.mark);if(P.slow)m.slow=Math.max(m.slow,P.slow);
           if(P.splash){for(const o of alive(B.mons))if(o!==m&&Math.hypot(o.x-m.x,(o.d-m.d)*(FY1-FY0)*1.25)<60*S)damage(u,o,P.splash,{noCrit:1,skill:1});B.fx.push({type:'ring',x:m.x,y:fy(m.d),t:0,d:.4,r:60*S,col:c1,ground:1});if(FX2)fxBurst(m.x,fy(m.d)-20*S,c1,50*S);shake(4);}if(u.spr&&u.spr.dboom&&u.spr.bi)B.fx.push({type:'sprBoom',x:m.x,y:fy(m.d),t:0,d:.6,r:60*S,im:u.spr.bi});sparks(m.x,headY(m)+20,10,c1);if(FX2){fxs('slash_02',c1,m.x,headY(m)+24*dsc(m.d),{d:.25,s0:50*S,s1:90*S,rot:-Math.PI/2+rnd(-.4,.4),ease:1});fxBurst(m.x,headY(m)+24*dsc(m.d),c2,40*S);if(F)fxs('fire_01','#ff9100',m.x,headY(m)+24*dsc(m.d),{d:.4,s0:20*S,s1:80*S,rot:rnd(0,TAU),ease:1});}}
-        if(FX2){const ty=fy(u.d)-30*dsc(u.d);fxs('muzzle_02',c2,u.x-26*S,ty,{d:.22,s0:70*S,s1:40*S,rot:-Math.PI/2,a0:.9});fxs('trace_01',c3,u.x-60*S,ty+rnd(-14,14)*S,{d:.25,s0:120*S,s1:160*S,sx:.6,rot:Math.PI/2,a0:.7});}
+        if(FX2&&!sprOK(u.spr)){const ty=fy(u.d)-30*dsc(u.d);fxs('muzzle_02',c2,u.x-26*S,ty,{d:.22,s0:70*S,s1:40*S,rot:-Math.PI/2,a0:.9});fxs('trace_01',c3,u.x-60*S,ty+rnd(-14,14)*S,{d:.25,s0:120*S,s1:160*S,sx:.6,rot:Math.PI/2,a0:.7});}
         for(let k=0;k<(F?5:3);k++)part({x:u.x-rnd(0,F?40:24)*S,y:fy(u.d)-rnd(4,40)*S,vx:rnd(-60,-20),vy:rnd(-20,20),life:rnd(.25,.5),r:rnd(3,F?9:7)*S,col:F?(k%2?'rgba(255,109,0,.75)':'rgba(255,214,0,.8)'):(k%2?'rgba(41,121,255,.7)':'rgba(180,230,255,.8)'),type:'flame'});
         if(u.x>W-20*S){a.back=true;}}
       else{u.face=-1;u.x-=v*.8;u.st='run';u.wph+=dt*22;const P=a.p||{};if(P.back){a.hit2=a.hit2||new Set();for(const m of alive(B.mons))if(!a.hit2.has(m)&&Math.abs(m.x-u.x)<26*S&&Math.abs(m.d-u.d)<(a.band||.2)){a.hit2.add(m);damage(u,m,P.back,{crit:1,skill:1});sparks(m.x,headY(m)+20,8,a.col||'#40c4ff');}}
@@ -1482,7 +1483,7 @@ function unitUpdate(u,dt,foes,friends){
 }
 function doHit(u,tg){const [x]=sxy(tg),y=headY(tg)+16*dsc(tg.d);
   if(u.hero){const R=u.role;
-    if(R==='inspect'){const [bx,sy]=muzzle(u,14,40),bc=sprOK(u.spr)?u.spr.col||'#ff5252':'#64ffda';B.fx.push({type:'beam',x0:bx,y0:sy,x1:x,y1:y,t:0,d:.26,col:bc,w:sprOK(u.spr)?4:3});if(FX2){fxs('circle_05',bc,x,y,{d:.22,s0:14*S,s1:44*S});fxs('circle_05',bc,bx,sy,{d:.15,s0:10*S,s1:26*S});}damage(u,tg,1);sparks(x,y,5,'#a7ffeb');}
+    if(R==='inspect'){const [bx,sy]=muzzle(u,14,40),bc=sprOK(u.spr)?u.spr.col||'#ff5252':'#64ffda';B.fx.push({type:'beam',x0:bx,y0:sy,x1:x,y1:y,t:0,d:.26,col:bc,w:sprOK(u.spr)?4:3});if(FX2){fxs('circle_05',bc,x,y,{d:.22,s0:14*S,s1:44*S});if(!sprOK(u.spr))fxs('circle_05',bc,bx,sy,{d:.15,s0:10*S,s1:26*S});}damage(u,tg,1);sparks(x,y,5,'#a7ffeb');}
     else if(R==='elec'){const [ex,ey]=muzzle(u,20,44),ec=u.spr&&u.spr.col;B.fx.push({type:'bolt',x0:ex,y0:ey,x1:x,y1:y,t:0,d:.24,col:ec});if(FX2){fxBolt(ex,ey,x,y,ec||'#40c4ff',34);fxs('circle_05','#80d8ff',x,y,{d:.2,s0:16*S,s1:40*S});}damage(u,tg,1);sparks(x,y,6,'#80d8ff');}
     else if(R==='service')shoot(u,tg,'bolt',1,u.spr&&u.spr.look?{look:u.spr.look}:null);
     else if(R==='paint'){const pc=['#e0457b','#29b6f6','#ffd21a','#76ff03'][u.hits++%4];shoot(u,tg,'paint',1,{col:pc});
@@ -1818,6 +1819,7 @@ const FRM=[0,1,2,3,4,5].map(i=>{const im=new Image();im.src='img/fr'+i+'.webp';r
 const FWIN=[[8.5,17.5,83,61.5],[8.5,17.5,83,61.5],[8.5,18,83,61],[15.5,17.5,69,55],[14.5,20.5,71,50],[17.8,21.5,64.4,46.5]]; // window % (same as the Team page)
 const FPLT=[[81,11],[81,11],[81,11],[73.5,9.5],[74.5,9.5],[74.5,9]]; // bottom plate % (top, height)
 const FSTR=[[62,78],[62,78],[62,78],[60,76],[58,74],[96,108]];
+const FACE={m0_0:0.7,m0_1:0.64,m0_2:0.64,m0_3:0.68,m0_4:0.6,m0_5:0.66,m0_6:0.62,m0_7:0.58,m0_8:0.58,m0_9:0.55,m1_0:0.55,m1_1:0.62,m1_2:0.58,m1_3:0.66,m1_4:0.62,m1_5:0.58,m1_6:0.58,m1_7:0.62,m1_8:0.58,m2_0:0.64,m2_1:0.58,m2_2:0.58,m2_3:0.66,m2_4:0.62,m2_5:0.62,m2_6:0.62,m2_7:0.65,m3_0:0.6,m3_1:0.6,m3_2:0.65,m3_3:0.62,m3_4:0.62,m3_5:0.65,m3_6:0.65,m4_0:0.64,m4_1:0.52,m4_2:0.62,m4_3:0.6,m4_4:0.58,m4_5:0.66,m5_0:0.5,m5_1:0.62}; // v16-40: where the face is in each portrait (0-1 of the width) → card window centred on it
 function drawFCard(u,x,y,cw,ch,ready,t){const h=u.h,i=h.crew?0:Math.min(5,h.gr|0),im=FRM[i];
   if(!im.complete||!im.naturalWidth)return false;
   const iw=im.naturalWidth,ih=im.naturalHeight;let s=cw/iw;if(ih*s>ch)s=ch/ih;
@@ -1832,8 +1834,9 @@ function drawFCard(u,x,y,cw,ch,ready,t){const h=u.h,i=h.crew?0:Math.min(5,h.gr|0
   // window: grade-coloured background + portrait (head at the top)
   g.save();g.beginPath();g.rect(wx,wy,ww,wh);g.clip();
   const bg=g.createLinearGradient(0,wy,0,wb);bg.addColorStop(0,GR.d);bg.addColorStop(1,'#07090c');g.fillStyle=bg;g.fillRect(wx,wy,ww,wh);
-  const pc=portraitCv(h);if(pc){const K=(pc.naturalWidth||pc.width)/128,sw=clamp(128*ww/(wh-22),78,128),dh=ww*128/sw;
-    g.drawImage(pc,(128-sw)/2*K,0,sw*K,128*K,wx,wy,ww,dh);
+  const pc=portraitCv(h);if(pc){const K=(pc.naturalWidth||pc.width)/128,AH=wh-22,wide=ww>AH;let sw=clamp(128*ww/AH,78,128),sH=128,y0=0,dh=ww*128/sw;
+    if(wide){sw=128;sH=Math.max(48,128*AH/ww);y0=clamp(.38*128-sH/2,0,128-sH);dh=AH;} // v16-40: wide card (few heroes) → show the face, not the top of the head
+    const x0=clamp((FACE[h.id]||.6)*128-sw/2,0,128-sw);g.drawImage(pc,x0*K,y0*K,sw*K,sH*K,wx,wy,ww,dh);
     const sh=g.createLinearGradient(0,wy+dh-18,0,wy+dh);sh.addColorStop(0,'rgba(7,9,12,0)');sh.addColorStop(1,'rgba(7,9,12,1)');g.fillStyle=sh;g.fillRect(wx,wy+dh-18,ww,18);
     g.fillStyle='#07090c';g.fillRect(wx,wy+dh,ww,wh-dh+1);}
   // name (shrinks to fit) + HP + energy at the bottom of the window
@@ -2068,7 +2071,7 @@ function openCard(i){const T=TE(),G=T.G,s=STAGES[i],C=CHAP[s.c],first=i>=G.cp.be
   $('cpCardBox').innerHTML=`<h2>${s.boss?IMGI(glyphURL('skull','#ff8a80'))+' ':s.mini?IMGI(glyphURL('horns','#ffb74d'))+' ':''}${sLabel(i)} · ${s.n}</h2><div class="sub">CHAPTER ${s.c+1} · ${C.zones[Math.floor(s.j/5)].toUpperCase()} · ${s.w.length} WAVES${G.cp.stars[i]?' · '+'⭐'.repeat(G.cp.stars[i]):''}</div>
    <div class="cpSec">ENEMIES</div><div class="mons" id="cpMons"></div>
    <div class="cpSec">POWER</div><div style="display:flex;justify-content:space-around;font-weight:900"><div>Enemy <span style="color:#ff8a80">${IMGI(glyphURL('swords','#ff8a80'),'1em','-.12em')} ${ep.toLocaleString()}</span></div><div>Your team <span style="color:${col}">${IMGI(glyphURL('swords',col),'1em','-.12em')} ${tp.toLocaleString()}</span></div></div>
-   ${(()=>{const st=G.cp.stuck;if(i!==G.cp.best||!st||st.si!==i)return '';const gk=Math.min(8,Math.floor((Date.now()-st.t)/216e5)),nx=gk<8?Math.ceil((216e5-(Date.now()-st.t)%216e5)/36e5):0;return `<div class="grit">🔥 NEVER GIVE UP: <b>+${Math.round(gk*7.5)}%</b> HP &amp; attack for this stage${gk<8?` · next +7.5% in ~${nx}h (max +60%)`:' (max)'}</div>`;})()}
+   ${(()=>{const st=G.cp.stuck;if(i!==G.cp.best||!st||st.si!==i)return '';const gk=Math.min(GRIT_N,Math.floor((Date.now()-st.t)/216e5)),nx=gk<GRIT_N?Math.ceil((216e5-(Date.now()-st.t)%216e5)/36e5):0;return `<div class="grit">🔥 NEVER GIVE UP: <b>+${Math.round(gritK(gk)*100)}%</b> HP &amp; attack for this stage${gk<GRIT_N?` · next +${gritStep(gk)*100}% in ~${nx}h (max +300%)`:' (max)'}</div>`;})()}
    <div class="cpSec">${first?'FIRST CLEAR REWARDS':'REPLAY REWARD'}</div><div class="rw"><span>${IMGI(badge('coin','#ffb300'))} ${T.fmt(first?R.money:Math.round(R.money*.25/10)*10)}</span>${first?`<span>${TKI} +${R.tk}</span>${R.ct?`<span><img class="tki" src="img/cticket.webp" style="height:1.15em;vertical-align:-.25em"> +${R.ct}</span>`:''}<span>${T.DMI} +${R.dm}</span>`:''}<span>${IMGI(glyphURL('bag','#ffd54a'))} ${first?(s.boss?'2 gear ★':big?'1 gear ★':'1 gear'):(big?'1 gear':'40% gear')}</span></div>
    <div class="sub" style="margin-top:6px">Gear chance: ${['Common','Uncommon','Rare','Epic','Legendary','Mythic'].map((n,k)=>gdrop(s.c)[k]?`<span style="color:${T.GRADES[k].c}">${n} ${gdrop(s.c)[k]}%</span>`:'').filter(Boolean).join(' · ')}${big?' · ★ better':''}</div>
    <div class="cpRow"><button class="cpGo alt" data-a="close">BACK</button><button class="cpGo" data-a="team">${IMGI(glyphURL('swords','#2a1000'),'1em','-.12em')} BATTLE</button></div>`;

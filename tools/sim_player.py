@@ -13,7 +13,7 @@ shutil.rmtree(DST, ignore_errors=True)
 shutil.copytree(SRC, DST, ignore=shutil.ignore_patterns('.git', 'sheets', 'preregister'))
 p = DST + '/battle.js'; s = open(p).read()
 s = s.replace("window.CAMPAIGN={open,close,openGear,mini};",
-  "window.CAMPAIGN={open,close,openGear,mini};window.__BT={simRun,finish,bestTeam,myMechs,autoPlan,equip,GR,GSLOT,gsummon,GSD,STAGES,NST,REWARD,pow,teamPower,heroOf,cleanGear,upCost,gMax,itemById,getB:()=>B,sLabel,CHAP};")
+  "window.CAMPAIGN={open,close,openGear,mini};window.__BT={roleOf,simRun,finish,bestTeam,myMechs,autoPlan,equip,GR,GSLOT,gsummon,GSD,STAGES,NST,REWARD,pow,teamPower,heroOf,cleanGear,upCost,gMax,itemById,getB:()=>B,sLabel,CHAP};")
 open(p, 'w').write(s)
 p = DST + '/index.html'; s = open(p).read()
 i = s.rindex('})();\n</script>'); s = s[:i] + 'window.__EV=c=>eval(c);\n' + s[i:]; open(p, 'w').write(s)
@@ -46,6 +46,10 @@ window.__BOT={
    for(let k=0;k<400;k++){let best=null;for(const id of G.cp.team||[]){const eq=g.eq[id];if(!eq)continue;for(const s in eq){const it=T.itemById(eq[s]);if(!it||it.lv>=T.gMax(it))continue;const c=T.upCost(it);if(!best||c<best.c)best={it,c};}}
      if(!best||best.c>budget)break;G.money-=best.c;budget-=best.c;best.it.lv++;n++;}
    if(n)save();return n;},
+ team(){ // like a real player: best tank (Bruiser/Legend) + best Medic, then the strongest others
+   const T=__BT,L=T.myMechs(),out=[];const take=f=>{const h=L.find(x=>!out.includes(x.id)&&f(T.roleOf(x)));if(h)out.push(h.id);};
+   take(r=>r==='engine'||r==='all');take(r=>r==='service');for(const h of L){if(out.length>=5)break;if(!out.includes(h.id))out.push(h.id);}
+   let k=0;while(out.length<5)out.push('crew'+(k++));return out;},
  daily(){
    try{dqCheck();}catch(e){}
    // check-in (5000 free summons)
@@ -67,22 +71,22 @@ window.__BOT={
    // best places in the garage
    for(const cat of ['m','d','g']){try{const plan=autoPlan(cat);for(const k of slotsOf(cat)){if(plan[k]&&G.h.as[k]!==plan[k])assign(k,plan[k]);}}catch(e){this.log.push('as '+cat+' '+e);}}
    // battle team + gear
-   const T=__BT;G.cp.team=T.bestTeam();T.cleanGear();const g2=T.GR();
+   const T=__BT;G.cp.team=this.team();T.cleanGear();const g2=T.GR();
    for(const id of G.cp.team){const h=HB[id];if(!h)continue;const ov=T.autoPlan(h);if(!g2.eq[h.id])g2.eq[h.id]={};for(const sl of T.GSLOT){if(ov[sl.k])T.equip(h.id,ov[sl.k]);}}
    try{closePop&&closePop();}catch(e){}
    document.querySelectorAll('.open').forEach(e=>{if(e.id!=='game')e.classList.remove('open');});
    save();return r;},
  battle(speed){ // one campaign battle at the next stage; returns game seconds used (real time = t/speed)
-   const T=__BT,si=G.cp.best;if(si>=T.NST)return null;const list=T.bestTeam().map(T.heroOf);
+   const T=__BT,si=G.cp.best;if(si>=T.NST)return null;const list=this.team().map(T.heroOf);
    const r=T.simRun(si,list,600);const B=T.getB();B.sim=0;try{T.finish(r.win);}catch(e){this.log.push('fin '+e);}
    try{document.querySelectorAll('.open').forEach(e=>{if(e.id!=='game')e.classList.remove('open');});window.__BATTLE_ON=false;}catch(e){}
    return {win:r.win,t:r.t,si};},
  state(){const own=G.h.own,gr=[0,0,0,0,0,0];for(const id in own){const h=HB[id];if(h&&h.cat==='m')gr[h.gr]++;}
-   const team=__BT.bestTeam().map(id=>id.startsWith('crew')?'crew':HB[id].n+' '+['C','U','R','E','L','M'][HB[id].gr]+'+'+own[id].s);
+   const team=this.team().map(id=>id.startsWith('crew')?'crew':HB[id].n+' '+['C','U','R','E','L','M'][HB[id].gr]+'+'+own[id].s);
    let lv=0,lvMax=0,n=0;for(const id in BLD){if(!BLD[id].cost||NOUP(id))continue;lv+=G.lv[id];n++;lvMax+=MAXLV;}
    return {money:Math.round(G.money),rep:G.rep,vip:VLV,stage:G.cp.best,label:G.cp.best<__BT.NST?__BT.sLabel(G.cp.best):'END',
      bld:Object.fromEntries(Object.keys(BLD).filter(id=>BLD[id].cost&&!NOUP(id)).map(id=>[id,G.lv[id]])),bldSum:lv+'/'+lvMax,
-     mechs:gr,team,power:Math.round(__BT.teamPower(__BT.bestTeam().map(__BT.heroOf))),
+     mechs:gr,team,power:Math.round(__BT.teamPower(this.team().map(__BT.heroOf))),
      dm:G.dm||0,tk:G.h.tk,sold:G.sold||0};}
 };
 """
