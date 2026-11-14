@@ -357,6 +357,16 @@ const MON={
  plow:{n:'FROST PLOW',hp:14500,atk:136,def:30,mv:28,rng:130,as:1.7,h:220,boss:1,b:'titan',big:5,summ:'hubcap',lc:'#80d8ff',desc:'Chapter boss'},
  wyrm:{n:'TURBO WYRM',hp:15500,atk:140,def:30,mv:28,rng:130,as:1.7,h:220,boss:1,b:'titan',big:5,summ:'turbo',lc:'#ff4fd8',desc:'Chapter boss'},
  omega:{n:'OMEGA ENGINE',hp:17000,atk:146,def:32,mv:28,rng:130,as:1.7,h:220,boss:1,b:'titan',big:5,summ:'bat',lc:'#ff3d00',desc:'Final boss'}};
+// v16-39: monsters drawn by Marius (ChatGPT sprite sheets, cut by tools/atlas_mon.py → img/mon/<id>.webp)
+// rows: idle 6 · walk 8 · attack 8 · skill 8 · hurt 4 · death 6 · w/h = cell, ax/ay = feet point, ih = idle height (atlas px)
+const MSPR={cbrute:{w:281,h:153,ax:140.5,ay:144.5,ih:138.6},crawler:{w:197,h:132,ax:98.5,ay:120.8,ih:115.6},esnake:{w:239,h:119,ax:119.5,ay:113.2,ih:100.0},hound:{w:253,h:119,ax:126.5,ay:112.8,ih:111.2},jtitan:{w:280,h:187,ax:140.0,ay:178.0,ih:176.0},ndragon:{w:294,h:171,ax:147.0,ay:166.0,ih:165.0},pimp:{w:228,h:142,ax:114.0,ay:135.2,ih:130.4},rat:{w:224,h:121,ax:112.0,ay:113.6,ih:109.6},towking:{w:284,h:179,ax:142.0,ay:169.0,ih:159.0},wasp:{w:269,h:163,ax:134.5,ay:145.8,ih:140.4}};
+// monster key → [sprite, height in game units, new name, hue (mini-boss colours per world)]
+const MSKIN={spider:['crawler',46,'Bolt Crawler'],tire:['rat',46,'Tire Rat'],imp:['pimp',50,'Piston Imp'],snake:['esnake',42,'Exhaust Snake'],
+ turbo:['hound',50,'Scrap Hound'],brute:['cbrute',88,'Crankshaft Brute'],
+ crusher:['wasp',128,'TURBO WASP'],sludge:['wasp',128,'TOXIC WASP',95],frost:['wasp',128,'FROST WASP',165],neonc:['wasp',128,'NEON WASP',265],magma:['wasp',128,'MAGMA WASP',-28],
+ titan:['jtitan',215,'JUNKYARD TITAN'],wyrm:['ndragon',190,'NITRO DRAGON'],plow:['towking',210,'TOW KING']};
+for(const k in MSKIN){const [id,h,n,hue]=MSKIN[k],M=MON[k];M.dr0=M.dr||k;M.dr='spr_'+id;M.sp=id;M.h=h;M.sc=1;M.n=n;if(hue!=null){M.hue=hue;M.sat=1.1;}}
+MON.wyrm.lc='#40c4ff';MON.titan.lz=[20,120];MON.wyrm.lz=[125,128];MON.plow.lz=[70,150];MON.plow.lc='#ffd740';MON.crusher.desc=MON.sludge.desc=MON.frost.desc=MON.neonc.desc=MON.magma.desc='Mini-boss · stinger dive';
 for(const k in MON){const M=MON[k];M.dr=M.dr||k;M.sc=M.sc||1;M.big=M.big||1;M.b=M.b||'';}
 
 // 5 chapters × 20 stages · 4 zones of 5 stages each
@@ -1130,9 +1140,27 @@ Object.assign(MDRAW,{
    hdr(armF,62,0);}
 });
 const FILT=typeof CanvasRenderingContext2D!=='undefined'&&'filter' in CanvasRenderingContext2D.prototype;
+function msprLoad(id){const d=MSPR[id];if(!d.im){d.im=new Image();d.im.decoding='async';d.im.src='img/mon/'+id+'.webp';}return d;}
+const msprOK=id=>{const d=msprLoad(id);return d.im.complete&&d.im.naturalWidth>0;};
+function msprFrame(u,t){const a=u.act,id=MON[u.t].sp;
+  if(u.dead)return[5,Math.min(5,Math.floor(u.deadT/.1))];
+  if(a&&a.k==='pound')return[3,Math.min(7,Math.floor(a.t/a.dur*8))];
+  if(a&&a.k==='laser'){if(id==='ndragon')return[3,a.t<a.dur?Math.min(2,Math.floor(a.t/a.dur*3)):2]; // dragon: open mouth, the game draws the nitro breath
+    return[3,Math.min(7,Math.floor(a.t/(a.dur+.6)*8))];}
+  if(a&&a.k==='charge'&&a.t<a.dur)return[3,Math.floor(a.t*8)%2+1];
+  if(u.st==='atk')return[u.alt?3:2,Math.min(7,Math.floor(u.ap*8))];
+  if(u.stun>0)return[4,3];
+  if(u.hurt>.35)return[4,u.hurt>.7?1:2];
+  if(u.st==='walk')return[1,Math.floor(u.wph/TAU*8+80)%8];
+  return[0,Math.floor(t*7+u.k)%6];}
+// drawn facing right like the other monsters (Marius' pictures face left → mirrored here)
+function drawSprMon(g,u,t,id){const M=MON[u.t],d=msprLoad(id);if(!msprOK(id)){MDRAW[M.dr0](g,u,t);return;}
+  const [r,c]=msprFrame(u,t),k=M.h/d.ih;g.save();g.scale(-1,1);if(id==='wasp')g.translate(0,-12-Math.sin(t*5+u.k)*3);
+  g.drawImage(d.im,c*d.w,r*d.h,d.w,d.h,-d.ax*k,-d.ay*k,d.w*k,d.h*k);g.restore();}
+for(const id in MSPR)MDRAW['spr_'+id]=(g,u,t)=>drawSprMon(g,u,t,id);
 function drawMonster(g,u,t){
   g.save();g.translate(u.sx,u.sy);g.scale(u.sc,u.sc);
-  let alpha=1;if(u.dead){alpha=clamp(1-u.deadT*1.6,0,1);}
+  const SPM=!!MON[u.t].sp;let alpha=1;if(u.dead){alpha=SPM?clamp(1-(u.deadT-.75)*2.6,0,1):clamp(1-u.deadT*1.6,0,1);}
   g.globalAlpha=alpha*GA;const M=MON[u.t],big=M.b==='titan'?70:M.b==='crusher'?34:M.big>1.5?26:16;
   g.fillStyle='rgba(0,0,0,.38)';ell(g,0,0,big,big*.28);
   if(u.mark>0){g.strokeStyle='rgba(80,255,170,.85)';g.lineWidth=1.6;g.beginPath();g.ellipse(0,0,big+4,(big+4)*.3,0,0,TAU);g.stroke();}
@@ -1141,10 +1169,10 @@ function drawMonster(g,u,t){
     const tr=g.getTransform(),ps=Math.max(.5,Math.hypot(tr.a,tr.b)),hw=M.b==='titan'?230:M.b==='crusher'?150:Math.max(64,M.h*1.5*(M.big>1?1.2:1)),top=M.h*(M.b==='titan'?1.45:1.7)+(M.fly?80:0)+60,bot=40;
     const cw=Math.ceil(2*hw*ps),ch=Math.ceil((top+bot)*ps);let oc=u._oc;if(!oc||oc.width<cw||oc.height<ch||oc.width>cw*1.6){oc=u._oc=document.createElement('canvas');oc.width=cw;oc.height=ch;}
     const o=oc.getContext('2d');o.setTransform(1,0,0,1,0,0);o.clearRect(0,0,oc.width,oc.height);o.setTransform(ps,0,0,ps,hw*ps,top*ps);
-    o.scale(u.face,1);if(u.dead)o.rotate(-u.deadT*.6);if(u.stun>0)o.rotate(Math.sin(t*30)*.04);const ga=GA;GA=1;MDRAW[M.dr](o,u,t);GA=ga;
+    o.scale(u.face,1);if(u.dead&&!SPM)o.rotate(-u.deadT*.6);if(u.stun>0)o.rotate(Math.sin(t*30)*.04);const ga=GA;GA=1;MDRAW[M.dr](o,u,t);GA=ga;
     g.filter='hue-rotate('+M.hue+'deg) saturate('+(M.sat||1)+') brightness('+(M.bri||1)+')';g.drawImage(oc,0,0,cw,ch,-hw,-top,2*hw,top+bot);g.filter='none';
   }else{
-  g.scale(u.face,1);if(u.dead)g.rotate(-u.deadT*.6);
+  g.scale(u.face,1);if(u.dead&&!SPM)g.rotate(-u.deadT*.6);
   if(u.stun>0)g.rotate(Math.sin(t*30)*.04);
   MDRAW[MON[u.t].dr](g,u,t);}
   g.restore();
@@ -1167,7 +1195,7 @@ function grit(si){const G=TE().G,st=G.cp.stuck;if(!st||st.si!==si||si!==G.cp.bes
 function mkHeroUnit(h,i,n){const s=unitStats(h),r=roleOf(h),gk=1+(B.grit||0);
   return {hero:1,h,spr:sprOf(h),land:0,role:r,look:lookOf(h),k:i*1.7,name:h.crew?h.n:h.n,hp:s.hp*gk,max:s.hp*gk,atk:s.atk*gk,def:s.def,mv:s.mv*S,rng:s.rng*S,as:s.as,crit:s.crit,eg:s.eg,
     x:0,d:0,face:1,st:'idle',ap:0,cd:rnd(0,.6),wph:rnd(0,6),en:0,stun:0,slow:0,mark:0,buff:0,aspd:0,aspdK:0,defB:0,critB:0,shield:0,flash:0,hurt:0,hot:0,hotT:0,taunt:0,dead:false,deadT:0,hits:0,act:null,slot:i};}
-function mkMon(t,i,k){const M=MON[t],m=stageMul(B.si)*stEase(B.si);
+function mkMon(t,i,k){const M=MON[t];if(M.sp)msprLoad(M.sp);const m=stageMul(B.si)*stEase(B.si);
   return {hero:0,t,k:rnd(0,9),name:M.n,boss:!!M.boss,hp:M.hp*m*1.25,max:M.hp*m*1.25,atk:M.atk*m,def:M.def*(1+Math.min(B.si,19)*.06),mv:M.mv*S,rng:M.rng*S,as:M.as,crit:.05,H:M.h,fly:!!M.fly,
     x:0,d:0,face:-1,st:'walk',ap:0,cd:rnd(.3,1),wph:rnd(0,6),roll:0,stun:0,slow:0,mark:0,weak:0,burn:0,burnT:0,ice:0,tw:0,flash:0,hurt:0,dot:0,dead:false,deadT:0,act:null,
     b:M.b,at:M.at||'',sp1:M.b==='pound'?4:M.b==='crusher'?3:M.b==='titan'?4:0,sp2:M.b==='crusher'?8:M.b==='titan'?9:0,sp3:M.b==='titan'?14:0,pounce:M.pounce?1:0,charge:M.charge?1:0,enr:false};}
@@ -1397,7 +1425,7 @@ function monAct(m,dt){const a=m.act;a.t+=dt;
     if(Math.random()<.6)smoke(m.x+30*S,fy(m.d),1,'rgba(140,110,80,.5)');
     if(m.x<=W*.06){m.act={k:'return',t:0};}}
   else if(a.k==='return'){m.face=1;m.st='walk';m.wph+=dt*10;m.x+=m.mv*dt*1.5;if(m.x>=Math.min(a.x0||W*.7,W*.72)){m.act=null;m.face=-1;}}
-  else if(a.k==='laser'){if(a.t>=a.dur&&!a.fired){a.fired=true;shake(12);for(const h of alive(B.heroes))if(Math.abs(h.d-a.d)<.16)damage(m,h,2.0);B.fx.push({type:'beam',x0:m.x-30*S,y0:fy(m.d)-185*dsc(m.d),x1:-20,y1:fy(a.d)-30*dsc(a.d),t:0,d:.6,col:MON[m.t].lc,w:16});}
+  else if(a.k==='laser'){if(a.t>=a.dur&&!a.fired){a.fired=true;shake(12);for(const h of alive(B.heroes))if(Math.abs(h.d-a.d)<.16)damage(m,h,2.0);const LZ=MON[m.t].lz||[30,185];B.fx.push({type:'beam',x0:m.x-LZ[0]*dsc(m.d),y0:fy(m.d)-LZ[1]*dsc(m.d),x1:-20,y1:fy(a.d)-30*dsc(a.d),t:0,d:.6,col:MON[m.t].lc,w:16});}
     if(a.t>=a.dur+.6){m.act=null;m.st='idle';}}}
 
 // ---------------------------------------------------------------- update
@@ -1445,7 +1473,7 @@ function unitUpdate(u,dt,foes,friends){
   u.cd-=dt;
   // spider pounce
   if(u.pounce&&dd<140*S&&dd>u.rng*1.5){u.pounce=0;u.act=null;B.fx.push({type:'dust',x:u.x,y:fy(u.d)});u.x=tg.x-u.face*24*S;u.d=tg.d;damage(u,tg,1.5);shake(4);sparks(tg.x,headY(tg)+20,8);return;}
-  if(dd<=range){if(u.cd<=0){u.st='atk';u.ap=0;}else if(u.st!=='atk')u.st='idle';return;}
+  if(dd<=range){if(u.cd<=0){u.st='atk';u.ap=0;if(!u.hero)u.alt=(u.na=(u.na||0)+1)%3===0;}else if(u.st!=='atk')u.st='idle';return;}
   // move
   const sp=u.mv*(u.slow>0?.5:1)*(u.charge?2.2:1)*dt;
   const tx=tg.x-u.face*range*.85,dx=tx-u.x,ddp=(tg.d-u.d)*(FY1-FY0);const L=Math.hypot(dx,ddp)||1;
@@ -2031,6 +2059,8 @@ function chList(){const T=TE(),G=T.G,cur=curCh();let h=`<div class="pT">${IMGI(g
 function chGo(dl){const T=TE(),G=T.G,c=curCh()+dl;if(c<0||c>=NCH)return;if(!chOpen(c)){T.toast('🔒 Beat '+MON[CHAP[c-1].boss].n+' (stage '+c+'-20) to open Chapter '+(c+1),2600);return;}G.cp.ch=c;showMap();$('cpMap').scrollTop=PH;}
 function monPreview(t){const c=document.createElement('canvas');c.width=136;c.height=116;const x=c.getContext('2d');const M=MON[t];const sc=Math.min(1.5,50/(M.b==='titan'?255:(M.h*M.sc+(M.fly?48:4))));
   x.setTransform(2,0,0,2,0,0);const u={t,b:M.b,sx:M.b==='titan'?36:34,sy:55,sc,face:-1,st:'idle',ap:0,wph:0,k:1,roll:0,d:.5,H:M.h,mark:0,slow:0,stun:0,flash:0,dead:false,enr:false};
+  if(M.sp){const d=MSPR[M.sp],k=M.h/d.ih;u.sc=Math.min(50/(d.ay*k),64/(d.w*k));u.sx=34;u.sy=57;
+    if(!msprOK(M.sp)){msprLoad(M.sp).im.addEventListener('load',()=>{x.clearRect(0,0,68,58);GA=1;drawMonster(x,u,1.3);},{once:true});}}
   GA=1;drawMonster(x,u,1.3);return c;}
 function openCard(i){const T=TE(),G=T.G,s=STAGES[i],C=CHAP[s.c],first=i>=G.cp.best,R=REWARD(i);const types=[...new Set(s.w.flat())];
   const tp=teamPower(curTeamList()),ep=enemyPower(i);
